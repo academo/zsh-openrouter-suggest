@@ -1,32 +1,25 @@
 # zsh-ollama-suggest
 
-AI-powered command suggestions for Zsh using [Ollama](https://ollama.ai/). Get real-time, context-aware command suggestions as you type, powered by local large language models.
+Command suggestions for Zsh using [Ollama](https://ollama.ai/). Uses local LLMs to suggest commands based on your input, history, and current directory.
 
 ![Demo](https://github.com/user-attachments/assets/86ab6538-02f6-49d4-ac45-144df403027d)
 
 ## Features
 
-- 🤖 Real-time command suggestions using local LLMs via Ollama
-- ⚡️ Asynchronous processing with smart job management
-- 🎯 Context-aware suggestions based on your current input
-- 🎨 Interactive menu with arrow (→) selection indicator
-- ⚙️ Customizable model and server settings
-- 🔍 Optional debug mode with timestamped logging
-
-## Technical Details
-
-- Suggestions appear after typing at least 2 characters
-- Maximum of 5 suggestions per query for optimal readability
-- Uses temperature setting of 0.1 for consistent, deterministic suggestions
-- Asynchronous processing with automatic job cancellation for outdated queries
-- Smart retry mechanism for model loading (up to 3 attempts)
+- Suggests commands as you type
+- Uses command history and directory contents for context
+- Processes suggestions asynchronously
+- Two modes: realtime (as you type) or manual (on demand)
+- Configurable settings for model, suggestions, and context
 
 ## Prerequisites
 
 - [Zsh](https://www.zsh.org/) shell
 - [Ollama](https://ollama.ai/) installed and running
+- `git` for installation
 - `curl` for API requests
 - `jq` for JSON parsing
+- `ls`, `awk`, `tail`, `head`, `grep` for directory and text processing
 - `zsh-async` (included as submodule)
 
 ## Installation
@@ -55,6 +48,18 @@ git clone --recursive https://github.com/realies/zsh-ollama-suggest.git
 source /path/to/zsh-ollama-suggest/zsh-ollama-suggest.plugin.zsh
 ```
 
+## Usage
+
+1. Start typing a command (suggestions appear after 2 characters)
+2. Suggestions will appear below your input:
+   - Automatically in realtime mode
+   - On demand with Ctrl+X c in manual mode
+3. Navigation:
+   - Up/Down arrows to cycle through suggestions
+   - Ctrl+C to clear suggestions and reset
+   - Ctrl+X t to toggle between realtime/manual modes
+   - Ctrl+X c to manually trigger suggestions
+
 ## Configuration
 
 The following variables can be set in your `.zshrc` before sourcing the plugin:
@@ -66,30 +71,24 @@ typeset -g ZSH_OLLAMA_SUGGEST_MODEL='llama3.2:3b'
 # Ollama server URL (default: http://localhost:11434)
 typeset -g ZSH_OLLAMA_SUGGEST_URL='http://localhost:11434'
 
+# Maximum number of suggestions to show (default: 5)
+typeset -g ZSH_OLLAMA_SUGGEST_MAX_SUGGESTIONS=5
+
+# Number of history entries to consider (default: 1000)
+typeset -g ZSH_OLLAMA_SUGGEST_HISTORY_SIZE=1000
+
+# Model temperature for suggestion diversity (default: 0.1)
+typeset -g ZSH_OLLAMA_SUGGEST_TEMPERATURE=0.1
+
+# Number of directory entries to show in context (default: 25)
+typeset -g ZSH_OLLAMA_SUGGEST_DIR_LIST_SIZE=25
+
+# Suggestion mode: 'realtime' or 'manual' (default: realtime)
+typeset -g ZSH_OLLAMA_SUGGEST_MODE='realtime'
+
 # Debug logging (default: 0)
-typeset -g ZSH_OLLAMA_SUGGEST_DEBUG=0  # Set to 1 to enable logging
+typeset -g ZSH_OLLAMA_SUGGEST_DEBUG=0
 ```
-
-## Usage
-
-1. Start typing a command (suggestions appear after 2 characters)
-2. Suggestions will appear below your input
-3. Navigation:
-   - Up/Down arrows to cycle through suggestions
-   - Enter to accept the selected suggestion
-   - Backspace to modify your input
-   - Ctrl+C to clear suggestions and reset
-   - Ctrl+X then t to toggle suggestions on/off
-4. The plugin automatically cancels outdated suggestions when you continue typing
-
-## Key Bindings
-
-- `↑` or `^[OA` or `^[[A` - Previous suggestion
-- `↓` or `^[OB` or `^[[B` - Next suggestion
-- `Enter` - Accept current suggestion
-- `Ctrl+C` - Clear suggestions and reset
-- `Ctrl+X t` - Toggle suggestions on/off (two separate keystrokes)
-- `Backspace` - Delete character and update suggestions
 
 ## Debugging
 
@@ -101,16 +100,12 @@ If you encounter issues:
 4. Verify your model is downloaded (`ollama list`)
 5. Check the log file for detailed operation tracing
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- [Ollama](https://ollama.ai/) for the amazing local LLM runtime
-- [zsh-async](https://github.com/mafredri/zsh-async) for the asynchronous processing framework
+- [Ollama](https://ollama.ai/) for the local LLM runtime
+- [zsh-async](https://github.com/mafredri/zsh-async) for async processing
 - [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) for inspiration
