@@ -378,12 +378,16 @@ _ollama_cancel_pending_jobs() {
 # Widget handlers
 _ollama_self_insert() {
     zle .self-insert
+    local ret=$?
     [[ "$ZSH_OLLAMA_SUGGEST_MODE" == "realtime" ]] && _ollama_suggest_widget
+    return $ret  # Preserve original return value
 }
 
 _ollama_backward_delete_char() {
     zle .backward-delete-char
+    local ret=$?
     [[ "$ZSH_OLLAMA_SUGGEST_MODE" == "realtime" ]] && _ollama_suggest_widget
+    return $ret  # Preserve original return value
 }
 
 _ollama_suggest_widget() {
@@ -424,12 +428,16 @@ _ollama_menu_down() {
             _ollama_original_buffer="$BUFFER"
             _ollama_selected_index=1
         else
-            (( _ollama_selected_index = (_ollama_selected_index % ${#_ollama_suggestions[@]}) + 1 ))
+            # Prevent wrapping around to avoid beep
+            if (( _ollama_selected_index < ${#_ollama_suggestions[@]} )); then
+                (( _ollama_selected_index++ ))
+            fi
         fi
         BUFFER="${_ollama_suggestions[$_ollama_selected_index]}"
         CURSOR=${#BUFFER}
         _ollama_display_suggestions "${_ollama_suggestions[@]}"
         _ollama_debug "Selected index now: $_ollama_selected_index"
+        return 0  # Explicitly return success
     else
         zle .down-line-or-history
     fi
@@ -450,6 +458,7 @@ _ollama_menu_up() {
             fi
             _ollama_display_suggestions "${_ollama_suggestions[@]}"
             _ollama_debug "Selected index now: $_ollama_selected_index"
+            return 0  # Explicitly return success
         fi
     else
         zle .up-line-or-history
