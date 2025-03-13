@@ -11,7 +11,7 @@ typeset -g ZSH_OPENROUTER_SUGGEST_DEBUG=0    # Set to 1 to enable logging to /tm
 (( ! ${+ZSH_OPENROUTER_SUGGEST_API_KEY} )) && typeset -g ZSH_OPENROUTER_SUGGEST_API_KEY=${OPENROUTER_API_KEY:-''}  # Use OPENROUTER_API_KEY environment variable
 (( ! ${+ZSH_OPENROUTER_SUGGEST_URL} )) && typeset -g ZSH_OPENROUTER_SUGGEST_URL='https://openrouter.ai/api/v1/chat/completions'
 (( ! ${+ZSH_OPENROUTER_SUGGEST_MAX_SUGGESTIONS} )) && typeset -g ZSH_OPENROUTER_SUGGEST_MAX_SUGGESTIONS=5  # Maximum number of suggestions to show
-(( ! ${+ZSH_OPENROUTER_SUGGEST_HISTORY_SIZE} )) && typeset -g ZSH_OPENROUTER_SUGGEST_HISTORY_SIZE=1000  # Number of history entries to consider
+
 (( ! ${+ZSH_OPENROUTER_SUGGEST_TEMPERATURE} )) && typeset -g ZSH_OPENROUTER_SUGGEST_TEMPERATURE=0.1  # Model temperature (0.0-1.0)
 (( ! ${+ZSH_OPENROUTER_SUGGEST_DIR_LIST_SIZE} )) && typeset -g ZSH_OPENROUTER_SUGGEST_DIR_LIST_SIZE=25  # Number of directory entries to show in context
 (( ! ${+ZSH_OPENROUTER_SUGGEST_MODE} )) && typeset -g ZSH_OPENROUTER_SUGGEST_MODE='manual'  # Mode: 'realtime' or 'manual'
@@ -25,7 +25,7 @@ typeset -gi _openrouter_job_counter=0        # Counter for unique worker IDs
 typeset -gi _openrouter_selected_index=0     # Currently selected suggestion index
 typeset -g  _openrouter_original_buffer=""   # Original command line buffer
 typeset -g  _openrouter_in_menu=0            # Whether we're in menu selection mode
-typeset -ga _openrouter_current_history=()   # Current request history data
+
 
 # Helper functions
 _openrouter_debug() {
@@ -33,87 +33,7 @@ _openrouter_debug() {
     echo "$(date '+%H:%M:%S.%3N') [$$] $1" >> /tmp/zsh-openrouter.log
 }
 
-# Function to get history entries for current request
-_ollama_get_history() {
-    # If history is already loaded for this request, return it
-    if (( ${#_ollama_current_history} > 0 )); then
-        echo "${(F)_ollama_current_history}"
-        return
-    fi
 
-    # Load history for this request
-    local history_data
-    history_data=$(fc -ln -$ZSH_OLLAMA_SUGGEST_HISTORY_SIZE -1)
-    _ollama_current_history=()
-    while IFS= read -r line; do
-        [[ -n "${line// }" ]] && _ollama_current_history+=("$line")
-    done <<< "$history_data"
-    echo "${(F)_ollama_current_history}"
-}
-
-# Function to format recent commands for JSON
-_openrouter_get_recent_commands() {
-    local -a history_entries
-    history_entries=("${(@f)$(_openrouter_get_history)}")
-    if (( ${#history_entries} > 0 )); then
-        _openrouter_debug "Recent commands found"
-        printf '%s\n' "${(@)history_entries[1,20]}" | jq -R -s -c 'split("\n") | map(select(length > 0))'
-    else
-        _openrouter_debug "No recent commands found, using empty array"
-        echo '[]'
-    fi
-}
-
-_openrouter_get_command_history() {
-    local size=${1:-$ZSH_OPENROUTER_SUGGEST_HISTORY_SIZE}
-    local pattern="$2"
-
-    local -a history_entries
-    history_entries=("${(@f)$(_openrouter_get_history)}")
-
-    # If pattern is provided, filter entries
-    if [[ -n "$pattern" ]]; then
-        # Escape the pattern for use in regex
-        local escaped_pattern="${pattern//\*/\\*}"
-        escaped_pattern="${escaped_pattern//\[/\\[}"
-        escaped_pattern="${escaped_pattern//\]/\\]}"
-
-        # Filter entries that start with the pattern
-        history_entries=( ${(M)history_entries:#${~escaped_pattern}*} )
-    fi
-
-    _openrouter_debug "Fetched ${#history_entries[@]} history entries for pattern: ${pattern:-none}"
-    echo "${(F)history_entries}"
-}
-
-# Get relevant history suggestions
-_openrouter_get_history_suggestions() {
-    local current_input="$1"
-    _openrouter_debug "Getting history suggestions for input: $current_input"
-
-    # Get relevant history entries
-    local -a matches=()
-    if [[ -n "$current_input" ]]; then
-        local -a history_entries
-        history_entries=("${(@f)$(_openrouter_get_history)}")
-
-        # Get exact matches (commands that start with current input)
-        matches=( ${(M)history_entries:#${~current_input}*} )
-
-        # If we have room for more suggestions, add similar matches
-        if (( ${#matches} < ZSH_OPENROUTER_SUGGEST_MAX_SUGGESTIONS )); then
-            # Get first word for similar matches
-            local first_word="${current_input%% *}"
-            local -a similar=( ${(M)history_entries:#${~first_word}*} )
-            # Remove exact matches from similar matches
-            similar=( ${similar:#${~current_input}*} )
-            matches+=( $similar )
-        fi
-    fi
-
-    _openrouter_debug "Found ${#matches[@]} history matches"
-    echo "${(F)matches}"
-}
 
 _openrouter_keep_pipe() {
     : >&2  # Keep async pipe alive
@@ -168,17 +88,11 @@ _openrouter_async_suggestion() {
     local retry_count=${2:-0}  # Track retry attempts
     _openrouter_debug "Async handler started for: '$current_command' (retry: $retry_count)"
 
-    # Clear history cache for new request
-    _openrouter_current_history=()
+
 
     _openrouter_keep_pipe
 
-    # Get history-based suggestions and properly escape them for JSON
-    local history_suggestions
-    history_suggestions="$(_openrouter_get_history_suggestions "$current_command")"
-    history_suggestions="$(echo "$history_suggestions" | jq -R -s -c 'split("\n") | map(select(length > 0))')"
 
-    _openrouter_debug "History suggestions: $history_suggestions"
 
     # Get current directory context
     local dir_context
