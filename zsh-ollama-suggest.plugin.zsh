@@ -201,7 +201,7 @@ _openrouter_async_suggestion() {
     _openrouter_debug "System prompt: $system_prompt"
 
     local response
-    local prompt="Suggest shell commands for the following user typing in a linux terminal: $current_command"
+    local prompt="Suggest 3 to 5 shell commands for the user typing this in a linux terminal: $current_command"
     _openrouter_debug "User prompt: $prompt"
 
     # Check if API key is set
