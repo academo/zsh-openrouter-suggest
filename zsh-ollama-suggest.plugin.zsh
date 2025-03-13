@@ -13,7 +13,7 @@ typeset -g ZSH_OLLAMA_SUGGEST_DEBUG=0    # Set to 1 to enable logging to /tmp/zs
 (( ! ${+ZSH_OLLAMA_SUGGEST_HISTORY_SIZE} )) && typeset -g ZSH_OLLAMA_SUGGEST_HISTORY_SIZE=1000  # Number of history entries to consider
 (( ! ${+ZSH_OLLAMA_SUGGEST_TEMPERATURE} )) && typeset -g ZSH_OLLAMA_SUGGEST_TEMPERATURE=0.1  # Model temperature (0.0-1.0)
 (( ! ${+ZSH_OLLAMA_SUGGEST_DIR_LIST_SIZE} )) && typeset -g ZSH_OLLAMA_SUGGEST_DIR_LIST_SIZE=25  # Number of directory entries to show in context
-(( ! ${+ZSH_OLLAMA_SUGGEST_MODE} )) && typeset -g ZSH_OLLAMA_SUGGEST_MODE='realtime'  # Mode: 'realtime' or 'manual'
+(( ! ${+ZSH_OLLAMA_SUGGEST_MODE} )) && typeset -g ZSH_OLLAMA_SUGGEST_MODE='manual'  # Mode: 'realtime' or 'manual'
 
 # Internal state management
 typeset -g  _ollama_suggestions=()       # Array of current suggestions
@@ -548,5 +548,5 @@ bindkey '^[[B' _ollama_menu_down   # Down arrow (alternate code)
 bindkey '^M' _ollama_menu_accept   # Enter
 bindkey '^C' _ollama_cleanup       # Ctrl+C
 bindkey '^Xt' _ollama_toggle_mode  # Ctrl-x t to toggle mode
-bindkey '^Xc' _ollama_suggest_widget  # Ctrl-x c to manually trigger suggestions
+bindkey '^G' _ollama_suggest_widget  # Ctrl-g to manually trigger suggestions
 bindkey '^?' backward-delete-char  # Backspace
