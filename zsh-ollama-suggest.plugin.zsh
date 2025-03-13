@@ -8,7 +8,7 @@ autoload -Uz add-zle-hook-widget
 # Configuration variables with defaults
 typeset -g ZSH_OPENROUTER_SUGGEST_DEBUG=0    # Set to 1 to enable logging to /tmp/zsh-openrouter-suggest.log
 (( ! ${+ZSH_OPENROUTER_SUGGEST_MODEL} )) && typeset -g ZSH_OPENROUTER_SUGGEST_MODEL='mistralai/ministral-3b'
-(( ! ${+ZSH_OPENROUTER_SUGGEST_API_KEY} )) && typeset -g ZSH_OPENROUTER_SUGGEST_API_KEY=${OPENROUTER_API_KEY:-''}  # Use existing OPENROUTER_API_KEY env variable
+(( ! ${+ZSH_OPENROUTER_SUGGEST_API_KEY} )) && typeset -g ZSH_OPENROUTER_SUGGEST_API_KEY=${OPENROUTER_API_KEY:-''}  # Use OPENROUTER_API_KEY environment variable
 (( ! ${+ZSH_OPENROUTER_SUGGEST_URL} )) && typeset -g ZSH_OPENROUTER_SUGGEST_URL='https://openrouter.ai/api/v1/chat/completions'
 (( ! ${+ZSH_OPENROUTER_SUGGEST_MAX_SUGGESTIONS} )) && typeset -g ZSH_OPENROUTER_SUGGEST_MAX_SUGGESTIONS=5  # Maximum number of suggestions to show
 (( ! ${+ZSH_OPENROUTER_SUGGEST_HISTORY_SIZE} )) && typeset -g ZSH_OPENROUTER_SUGGEST_HISTORY_SIZE=1000  # Number of history entries to consider
@@ -206,7 +206,7 @@ _openrouter_async_suggestion() {
 
     # Check if API key is set
     if [[ -z "$ZSH_OPENROUTER_SUGGEST_API_KEY" ]]; then
-        _openrouter_debug "OpenRouter API key is not set. Please set ZSH_OPENROUTER_SUGGEST_API_KEY."
+        _openrouter_debug "OpenRouter API key is not set. Please set the OPENROUTER_API_KEY environment variable or ZSH_OPENROUTER_SUGGEST_API_KEY."
         return 1
     fi
 
@@ -217,27 +217,30 @@ _openrouter_async_suggestion() {
     # Create the JSON schema for response format
     local json_schema='{"name":"commands","strict":true,"schema":{"type":"object","properties":{"commands":{"type":"array","items":{"type":"object","properties":{"command":{"type":"string","description":"The command string. Linux compatible."},"description":{"type":"string","description":"Description of what the command does"}},"required":["command","description"],"additionalProperties":false},"description":"Array of command objects"}},"required":["commands"],"additionalProperties":false}}'
     
-    response=$(curl -s -H "Content-Type: application/json" -H "Authorization: Bearer $ZSH_OPENROUTER_SUGGEST_API_KEY" "${ZSH_OPENROUTER_SUGGEST_URL}" -d @- 2> >(while IFS= read -r line; do _openrouter_debug "curl: $line"; done) <<EOF
+    # Create the JSON payload for the API request
+    local json_payload="
 {
-  "model": "$ZSH_OPENROUTER_SUGGEST_MODEL",
-  "messages": [
+  \"model\": \"$ZSH_OPENROUTER_SUGGEST_MODEL\",
+  \"messages\": [
     {
-      "role": "system",
-      "content": "$system_prompt"
+      \"role\": \"system\",
+      \"content\": \"$system_prompt\"
     },
     {
-      "role": "user",
-      "content": "$prompt"
+      \"role\": \"user\",
+      \"content\": \"$prompt\"
     }
   ],
-  "response_format": {
-    "type": "json_schema",
-    "json_schema": $json_schema
+  \"response_format\": {
+    \"type\": \"json_schema\",
+    \"json_schema\": $json_schema
   },
-  "temperature": $ZSH_OPENROUTER_SUGGEST_TEMPERATURE
+  \"temperature\": $ZSH_OPENROUTER_SUGGEST_TEMPERATURE
 }
-EOF
-) || { _openrouter_debug "Curl request to ${ZSH_OPENROUTER_SUGGEST_URL} failed"; return 1; }
+"
+
+    # Pipe curl directly to jq to parse the JSON content
+    response=$(echo "$json_payload" | curl -s -H "Content-Type: application/json" -H "Authorization: Bearer $ZSH_OPENROUTER_SUGGEST_API_KEY" "${ZSH_OPENROUTER_SUGGEST_URL}" -d @- 2> >(while IFS= read -r line; do _openrouter_debug "curl: $line"; done) | jq '.choices[0].message.content |= fromjson') || { _openrouter_debug "Curl request to ${ZSH_OPENROUTER_SUGGEST_URL} failed"; return 1; }
 
     _openrouter_debug "Raw response: $response"
 
@@ -250,19 +253,10 @@ EOF
         _openrouter_debug "Full response: $response"
         return 1
     fi
-
-    # Extract the commands from the JSON response
-    local content=$(echo "$response" | jq -r '.choices[0].message.content // empty')
-    _openrouter_debug "Raw content: $content"
     
-    if [[ -z "$content" ]]; then
-        _openrouter_debug "No content received from API for command: $current_command"
-        return 1
-    fi
-    
-    # Parse the JSON content to extract commands
+    # Extract the commands directly from the parsed JSON response
     local commands_json
-    commands_json=$(echo "$content" | jq -r '.commands // empty' 2>/dev/null)
+    commands_json=$(echo "$response" | jq -r '.choices[0].message.content.commands // empty' 2>/dev/null)
     
     if [[ -z "$commands_json" || "$commands_json" == "null" ]]; then
         _openrouter_debug "Failed to parse commands JSON from content"
